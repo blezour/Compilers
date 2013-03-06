@@ -1,0 +1,729 @@
+   0  $accept : %entry% $end
+
+   1  program : BEGIN stmts END DOT
+
+   2  stmts : stmt_list
+
+   3  stmt_list : stmt
+   4            | stmt SEMI stmt_list
+
+   5  stmt :
+   6       | name ASSIGN expr
+   7       | PRINT expr
+   8       | NEWLINE
+   9       | IF expr THEN stmts END
+  10       | IF expr THEN stmts ELSE stmts END
+  11       | WHILE expr DO stmts END
+  12       | REPEAT stmts UNTIL expr
+  13       | LOOP stmts END
+  14       | EXIT
+
+  15  expr : simple
+  16       | expr RELOP simple
+
+  17  simple : term
+  18         | simple ADDOP term
+  19         | simple MINUS term
+
+  20  term : factor
+  21       | term MULOP factor
+
+  22  factor : name
+  23         | NUMBER
+  24         | MONOP factor
+  25         | MINUS factor
+  26         | LPAR expr RPAR
+
+  27  name : IDENT
+
+  28  %entry% : '\001' program
+
+state 0
+	$accept : . %entry% $end  (0)
+
+	'\001'  shift 1
+	.  error
+
+	%entry%  goto 2
+
+
+state 1
+	%entry% : '\001' . program  (28)
+
+	BEGIN  shift 3
+	.  error
+
+	program  goto 4
+
+
+state 2
+	$accept : %entry% . $end  (0)
+
+	$end  accept
+
+
+state 3
+	program : BEGIN . stmts END DOT  (1)
+	stmt : .  (5)
+
+	IDENT  shift 5
+	IF  shift 6
+	WHILE  shift 7
+	REPEAT  shift 8
+	LOOP  shift 9
+	PRINT  shift 10
+	NEWLINE  shift 11
+	EXIT  shift 12
+	SEMI  reduce 5
+	END  reduce 5
+
+	stmts  goto 13
+	stmt_list  goto 14
+	stmt  goto 15
+	name  goto 16
+
+
+state 4
+	%entry% : '\001' program .  (28)
+
+	.  reduce 28
+
+
+state 5
+	name : IDENT .  (27)
+
+	.  reduce 27
+
+
+state 6
+	stmt : IF . expr THEN stmts END  (9)
+	stmt : IF . expr THEN stmts ELSE stmts END  (10)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	expr  goto 22
+	simple  goto 23
+	term  goto 24
+	factor  goto 25
+
+
+state 7
+	stmt : WHILE . expr DO stmts END  (11)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	expr  goto 26
+	simple  goto 23
+	term  goto 24
+	factor  goto 25
+
+
+state 8
+	stmt : REPEAT . stmts UNTIL expr  (12)
+	stmt : .  (5)
+
+	IDENT  shift 5
+	IF  shift 6
+	WHILE  shift 7
+	REPEAT  shift 8
+	LOOP  shift 9
+	PRINT  shift 10
+	NEWLINE  shift 11
+	EXIT  shift 12
+	SEMI  reduce 5
+	UNTIL  reduce 5
+
+	stmts  goto 27
+	stmt_list  goto 14
+	stmt  goto 15
+	name  goto 16
+
+
+state 9
+	stmt : LOOP . stmts END  (13)
+	stmt : .  (5)
+
+	IDENT  shift 5
+	IF  shift 6
+	WHILE  shift 7
+	REPEAT  shift 8
+	LOOP  shift 9
+	PRINT  shift 10
+	NEWLINE  shift 11
+	EXIT  shift 12
+	SEMI  reduce 5
+	END  reduce 5
+
+	stmts  goto 28
+	stmt_list  goto 14
+	stmt  goto 15
+	name  goto 16
+
+
+state 10
+	stmt : PRINT . expr  (7)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	expr  goto 29
+	simple  goto 23
+	term  goto 24
+	factor  goto 25
+
+
+state 11
+	stmt : NEWLINE .  (8)
+
+	.  reduce 8
+
+
+state 12
+	stmt : EXIT .  (14)
+
+	.  reduce 14
+
+
+state 13
+	program : BEGIN stmts . END DOT  (1)
+
+	END  shift 30
+	.  error
+
+
+state 14
+	stmts : stmt_list .  (2)
+
+	.  reduce 2
+
+
+state 15
+	stmt_list : stmt .  (3)
+	stmt_list : stmt . SEMI stmt_list  (4)
+
+	SEMI  shift 31
+	ELSE  reduce 3
+	END  reduce 3
+	UNTIL  reduce 3
+
+
+state 16
+	stmt : name . ASSIGN expr  (6)
+
+	ASSIGN  shift 32
+	.  error
+
+
+state 17
+	factor : MONOP . factor  (24)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	factor  goto 33
+
+
+state 18
+	factor : NUMBER .  (23)
+
+	.  reduce 23
+
+
+state 19
+	factor : LPAR . expr RPAR  (26)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	expr  goto 34
+	simple  goto 23
+	term  goto 24
+	factor  goto 25
+
+
+state 20
+	factor : MINUS . factor  (25)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	factor  goto 35
+
+
+state 21
+	factor : name .  (22)
+
+	.  reduce 22
+
+
+state 22
+	stmt : IF expr . THEN stmts END  (9)
+	stmt : IF expr . THEN stmts ELSE stmts END  (10)
+	expr : expr . RELOP simple  (16)
+
+	RELOP  shift 36
+	THEN  shift 37
+	.  error
+
+
+state 23
+	expr : simple .  (15)
+	simple : simple . ADDOP term  (18)
+	simple : simple . MINUS term  (19)
+
+	ADDOP  shift 38
+	MINUS  shift 39
+	RELOP  reduce 15
+	SEMI  reduce 15
+	RPAR  reduce 15
+	DO  reduce 15
+	ELSE  reduce 15
+	END  reduce 15
+	THEN  reduce 15
+	UNTIL  reduce 15
+
+
+state 24
+	simple : term .  (17)
+	term : term . MULOP factor  (21)
+
+	MULOP  shift 40
+	ADDOP  reduce 17
+	RELOP  reduce 17
+	SEMI  reduce 17
+	RPAR  reduce 17
+	MINUS  reduce 17
+	DO  reduce 17
+	ELSE  reduce 17
+	END  reduce 17
+	THEN  reduce 17
+	UNTIL  reduce 17
+
+
+state 25
+	term : factor .  (20)
+
+	.  reduce 20
+
+
+state 26
+	stmt : WHILE expr . DO stmts END  (11)
+	expr : expr . RELOP simple  (16)
+
+	RELOP  shift 36
+	DO  shift 41
+	.  error
+
+
+state 27
+	stmt : REPEAT stmts . UNTIL expr  (12)
+
+	UNTIL  shift 42
+	.  error
+
+
+state 28
+	stmt : LOOP stmts . END  (13)
+
+	END  shift 43
+	.  error
+
+
+state 29
+	stmt : PRINT expr .  (7)
+	expr : expr . RELOP simple  (16)
+
+	RELOP  shift 36
+	SEMI  reduce 7
+	ELSE  reduce 7
+	END  reduce 7
+	UNTIL  reduce 7
+
+
+state 30
+	program : BEGIN stmts END . DOT  (1)
+
+	DOT  shift 44
+	.  error
+
+
+state 31
+	stmt_list : stmt SEMI . stmt_list  (4)
+	stmt : .  (5)
+
+	IDENT  shift 5
+	IF  shift 6
+	WHILE  shift 7
+	REPEAT  shift 8
+	LOOP  shift 9
+	PRINT  shift 10
+	NEWLINE  shift 11
+	EXIT  shift 12
+	SEMI  reduce 5
+	ELSE  reduce 5
+	END  reduce 5
+	UNTIL  reduce 5
+
+	stmt_list  goto 45
+	stmt  goto 15
+	name  goto 16
+
+
+state 32
+	stmt : name ASSIGN . expr  (6)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	expr  goto 46
+	simple  goto 23
+	term  goto 24
+	factor  goto 25
+
+
+state 33
+	factor : MONOP factor .  (24)
+
+	.  reduce 24
+
+
+state 34
+	expr : expr . RELOP simple  (16)
+	factor : LPAR expr . RPAR  (26)
+
+	RELOP  shift 36
+	RPAR  shift 47
+	.  error
+
+
+state 35
+	factor : MINUS factor .  (25)
+
+	.  reduce 25
+
+
+state 36
+	expr : expr RELOP . simple  (16)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	simple  goto 48
+	term  goto 24
+	factor  goto 25
+
+
+state 37
+	stmt : IF expr THEN . stmts END  (9)
+	stmt : IF expr THEN . stmts ELSE stmts END  (10)
+	stmt : .  (5)
+
+	IDENT  shift 5
+	IF  shift 6
+	WHILE  shift 7
+	REPEAT  shift 8
+	LOOP  shift 9
+	PRINT  shift 10
+	NEWLINE  shift 11
+	EXIT  shift 12
+	SEMI  reduce 5
+	ELSE  reduce 5
+	END  reduce 5
+
+	stmts  goto 49
+	stmt_list  goto 14
+	stmt  goto 15
+	name  goto 16
+
+
+state 38
+	simple : simple ADDOP . term  (18)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	term  goto 50
+	factor  goto 25
+
+
+state 39
+	simple : simple MINUS . term  (19)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	term  goto 51
+	factor  goto 25
+
+
+state 40
+	term : term MULOP . factor  (21)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	factor  goto 52
+
+
+state 41
+	stmt : WHILE expr DO . stmts END  (11)
+	stmt : .  (5)
+
+	IDENT  shift 5
+	IF  shift 6
+	WHILE  shift 7
+	REPEAT  shift 8
+	LOOP  shift 9
+	PRINT  shift 10
+	NEWLINE  shift 11
+	EXIT  shift 12
+	SEMI  reduce 5
+	END  reduce 5
+
+	stmts  goto 53
+	stmt_list  goto 14
+	stmt  goto 15
+	name  goto 16
+
+
+state 42
+	stmt : REPEAT stmts UNTIL . expr  (12)
+
+	IDENT  shift 5
+	MONOP  shift 17
+	NUMBER  shift 18
+	LPAR  shift 19
+	MINUS  shift 20
+	.  error
+
+	name  goto 21
+	expr  goto 54
+	simple  goto 23
+	term  goto 24
+	factor  goto 25
+
+
+state 43
+	stmt : LOOP stmts END .  (13)
+
+	.  reduce 13
+
+
+state 44
+	program : BEGIN stmts END DOT .  (1)
+
+	.  reduce 1
+
+
+state 45
+	stmt_list : stmt SEMI stmt_list .  (4)
+
+	.  reduce 4
+
+
+state 46
+	stmt : name ASSIGN expr .  (6)
+	expr : expr . RELOP simple  (16)
+
+	RELOP  shift 36
+	SEMI  reduce 6
+	ELSE  reduce 6
+	END  reduce 6
+	UNTIL  reduce 6
+
+
+state 47
+	factor : LPAR expr RPAR .  (26)
+
+	.  reduce 26
+
+
+state 48
+	expr : expr RELOP simple .  (16)
+	simple : simple . ADDOP term  (18)
+	simple : simple . MINUS term  (19)
+
+	ADDOP  shift 38
+	MINUS  shift 39
+	RELOP  reduce 16
+	SEMI  reduce 16
+	RPAR  reduce 16
+	DO  reduce 16
+	ELSE  reduce 16
+	END  reduce 16
+	THEN  reduce 16
+	UNTIL  reduce 16
+
+
+state 49
+	stmt : IF expr THEN stmts . END  (9)
+	stmt : IF expr THEN stmts . ELSE stmts END  (10)
+
+	ELSE  shift 55
+	END  shift 56
+	.  error
+
+
+state 50
+	simple : simple ADDOP term .  (18)
+	term : term . MULOP factor  (21)
+
+	MULOP  shift 40
+	ADDOP  reduce 18
+	RELOP  reduce 18
+	SEMI  reduce 18
+	RPAR  reduce 18
+	MINUS  reduce 18
+	DO  reduce 18
+	ELSE  reduce 18
+	END  reduce 18
+	THEN  reduce 18
+	UNTIL  reduce 18
+
+
+state 51
+	simple : simple MINUS term .  (19)
+	term : term . MULOP factor  (21)
+
+	MULOP  shift 40
+	ADDOP  reduce 19
+	RELOP  reduce 19
+	SEMI  reduce 19
+	RPAR  reduce 19
+	MINUS  reduce 19
+	DO  reduce 19
+	ELSE  reduce 19
+	END  reduce 19
+	THEN  reduce 19
+	UNTIL  reduce 19
+
+
+state 52
+	term : term MULOP factor .  (21)
+
+	.  reduce 21
+
+
+state 53
+	stmt : WHILE expr DO stmts . END  (11)
+
+	END  shift 57
+	.  error
+
+
+state 54
+	stmt : REPEAT stmts UNTIL expr .  (12)
+	expr : expr . RELOP simple  (16)
+
+	RELOP  shift 36
+	SEMI  reduce 12
+	ELSE  reduce 12
+	END  reduce 12
+	UNTIL  reduce 12
+
+
+state 55
+	stmt : IF expr THEN stmts ELSE . stmts END  (10)
+	stmt : .  (5)
+
+	IDENT  shift 5
+	IF  shift 6
+	WHILE  shift 7
+	REPEAT  shift 8
+	LOOP  shift 9
+	PRINT  shift 10
+	NEWLINE  shift 11
+	EXIT  shift 12
+	SEMI  reduce 5
+	END  reduce 5
+
+	stmts  goto 58
+	stmt_list  goto 14
+	stmt  goto 15
+	name  goto 16
+
+
+state 56
+	stmt : IF expr THEN stmts END .  (9)
+
+	.  reduce 9
+
+
+state 57
+	stmt : WHILE expr DO stmts END .  (11)
+
+	.  reduce 11
+
+
+state 58
+	stmt : IF expr THEN stmts ELSE stmts . END  (10)
+
+	END  shift 59
+	.  error
+
+
+state 59
+	stmt : IF expr THEN stmts ELSE stmts END .  (10)
+
+	.  reduce 10
+
+
+33 terminals, 11 nonterminals
+29 grammar rules, 60 states

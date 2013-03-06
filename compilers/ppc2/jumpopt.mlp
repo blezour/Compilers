@@ -1,0 +1,128 @@
+(* ppc2/jumpopt.mlp *)
+
+open Keiko
+
+(* Disjoint sets of labels *)
+
+type labdata = 
+    LabDef of labrec  			(* An extant label *)
+  | Equiv of codelab			(* A label that's been merged *)
+
+and labrec = 
+  { y_id : codelab;  			(* Name of the label *)
+    y_refct : int ref }			(* Reference count *)
+
+let label_tab = Hashtbl.create 257
+
+(* get_label -- find or create a label *)
+let get_label x =
+  try Hashtbl.find label_tab x with
+    Not_found -> 
+      let y = LabDef { y_id = x; y_refct = ref 0 } in
+      Hashtbl.add label_tab x y; y
+
+(* find_label -- find equivalent of a label *)
+let rec find_label x =
+  match get_label x with
+      LabDef y -> y
+    | Equiv x' -> find_label x'
+
+let rename x = let y = find_label x in y.y_id
+
+let ref_count x = let y = find_label x in y.y_refct
+
+(* same_lab -- test if two labels are equal *)
+let same_lab x1 x2 =
+  let y1 = find_label x1 and y2 = find_label x2 in
+  y1.y_id = y2.y_id
+
+(* equate -- make two labels equal *)
+let equate x1 x2 =
+  let y1 = find_label x1 and y2 = find_label x2 in
+  if y1.y_id = y2.y_id then failwith "equate";
+  y2.y_refct := !(y1.y_refct) + !(y2.y_refct);
+  Hashtbl.add label_tab y1.y_id (Equiv y2.y_id)  
+
+(* do_refs -- call function on each label *)
+let do_refs f <w, @ts> =
+  match w with
+      JUMP x -> f (ref_count x)
+    | JUMPC (w, x) -> f (ref_count x)
+    | JUMPB (b, x) -> f (ref_count x)
+    | _ -> ()
+
+(* rename_labs -- replace each label by its equivalent *)
+let rename_labs <w, @ts> = 
+  let w' =
+    match w with
+	LABEL x -> LABEL (rename x)
+      | JUMP x -> JUMP (rename x)
+      | JUMPC (w, x) -> JUMPC (w, rename x)
+      | JUMPB (b, x) -> JUMPB (b, rename x)
+      | w -> w in
+  <w', @ts>
+
+(* get_op -- find operation at root of tree *)
+let get_op <w, @_> = w
+
+let optstep changed code =
+  let ch = ref true in
+  let replace n inserted = 
+    changed := true; ch := true;
+    let deleted = Util.take n !code in
+    List.iter (do_refs decr) deleted;
+    List.iter (do_refs incr) inserted; 
+    code := inserted @ Util.drop n !code in
+  let delete n = replace (n+1) (Util.take n !code) in
+  let args n = let <w, @ts> = List.nth !code n in ts in
+  while !ch do
+    ch := false;
+    (* Just look at the roots of the trees *)
+    match List.map get_op (Util.take 3 !code) with
+        JUMP lab1 :: LABEL lab2 :: _ -> 
+	  if same_lab lab1 lab2 then delete 0
+      | JUMP lab :: _ :: _ -> 
+	  delete 1
+      | JUMPC (w, lab1) :: JUMP lab2 :: LABEL lab3 :: _ ->
+	  if same_lab lab1 lab3 then
+	    replace 2 [<JUMPC (negate w, lab2), @(args 0)>]
+      | LABEL lab1 :: JUMP lab2 :: _ -> 
+	  if not (same_lab lab1 lab2) then begin
+	    delete 0; equate lab1 lab2
+	  end
+      | LABEL lab1 :: LABEL lab2 :: _ ->
+	  delete 0; equate lab1 lab2
+      | LABEL lab :: _ ->
+	  if !(ref_count lab) = 0 then delete 0
+
+      (* Tidy up line numbers *)
+      | LINE n :: JUMP lab :: _ ->
+	  delete 0
+      | LINE n :: LABEL lab :: _ ->
+	  replace 2 [<LABEL lab>; <LINE n>]
+      | LINE m :: LINE n :: _ ->
+	  delete 0
+
+      | _ -> ()
+  done
+
+let optimize prog =
+  Hashtbl.clear label_tab;
+  let init = prog in
+  List.iter (do_refs incr) init;
+  let buf1 = ref init and buf2 = ref [] in
+  let changed = ref true in
+  while !changed do
+    changed := false;
+    while !buf1 <> [] do
+      optstep changed buf1;
+      if !buf1 <> [] then begin
+	buf2 := List.hd !buf1 :: !buf2;
+	buf1 := List.tl !buf1
+      end
+    done;
+    buf1 := List.rev !buf2;
+    buf2 := []
+  done;
+  List.map rename_labs !buf1
+

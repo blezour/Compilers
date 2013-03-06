@@ -1,0 +1,9 @@
+#!/bin/sh
+
+TOOLS=tools
+
+set -x
+
+./ppc $* >a.ss \
+    && $TOOLS/risc86 <a.ss >a.s \
+    && gcc a.s pas0.o -o a.out

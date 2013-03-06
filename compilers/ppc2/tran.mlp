@@ -1,0 +1,185 @@
+(* ppc2/tran.mlp *)
+
+open Keiko
+open Risc86
+open Regs
+open Print
+
+(* |release| -- release any register used by a value *)
+let release =
+  function
+      RegVal reg -> Regs.release_reg reg
+    | Offset (off, reg) -> Regs.release_reg reg
+    | Index (lab, off, reg) -> Regs.release_reg reg
+    | _ -> ()
+
+(* |gen_reg| -- emit instruction with result in a register *)
+let gen_reg op rands =
+  match rands with
+      RegVal r :: others ->
+	List.iter release others;
+	let r' = get_reg r in
+	Risc86.emit op (RegVal r' :: others);
+	RegVal r'
+    | _ -> failwith "gen_reg"
+
+(* |gen| -- emit an instruction *)
+let gen op rands =
+  List.iter release rands;
+  Risc86.emit op rands
+
+(* |load_reg| -- move value to specific register *)
+let load_reg dst src =
+  if dst = R_any || dst = src then
+    RegVal src
+  else
+    gen_reg "mov" [RegVal dst; RegVal src]
+
+(* |eval_to_reg| -- evaluate expression with result in a register *)
+let rec eval_to_reg t r =
+  match t with
+      <CONST k> ->
+	gen_reg "mov" [RegVal r; Const k]
+    | <LOCAL n> ->
+	if n = 0 then
+	  load_reg r R_bp
+	else
+	  gen_reg "add" [RegVal r; RegVal R_bp; Const n]
+    | <GLOBAL (x, n)> ->
+	gen_reg "mov" [RegVal r; Global (x, n)]
+    | <LOAD s, <TEMP n>> ->
+	load_reg r (Regs.use_temp n)
+    | <LOAD s, t1> ->
+	let v1 = eval_to_addr t1 in
+	gen_reg (if s = 1 then "ldc" else "ldw") [RegVal r; v1]
+    | <CALL (n, res), @(fn::args)> ->
+	exec_call n fn args;
+	load_reg r R_0
+    | <MONOP w, t1> ->
+	let unary op =
+	  let v1 = eval_to_reg t1 R_any in
+	  gen_reg op [RegVal r; v1] in
+	(match w with
+	    Plus -> eval_to_reg t1 r
+	  | Minus -> unary "neg"
+	  | Not -> unary "not"
+	  | _ -> failwith "eval monop")
+    | <BINOP w, t1, t2> ->
+	let binary op =
+	  let v1 = eval_to_reg t1 R_any in
+	  let v2 = eval_to_rc t2 in
+	  gen_reg op [RegVal r; v1; v2] in
+	(match w with
+	    Plus | PlusA -> binary "add"
+	  | Minus -> binary "sub"
+	  | Times -> binary "mul"
+	  | And -> binary "and"
+	  | Or -> binary "or"
+	  | Eq -> binary "seteq"
+	  | Neq -> binary "setne"
+	  | Gt -> binary "setgt"
+	  | Geq -> binary "setge"
+	  | Lt -> binary "setlt"
+	  | Leq -> binary "setle"
+	  | Lsl -> binary "shl"
+	  | _ -> failwith (sprintf "eval binop $" [fOp w]))
+    | <w, @args> ->
+	failwith (sprintf "eval $" [fInst w])
+
+(* |eval_to_rc| -- evaluate expression to register or as constant *)
+and eval_to_rc =
+  function
+      <CONST k> -> Const k
+    | <GLOBAL (x, n)> -> Global (x, n)
+    | t -> eval_to_reg t R_any
+
+(* |eval_to_addr| -- evaluate expression to address value *)
+and eval_to_addr =
+  function
+      <LOCAL n> -> Offset (n, R_bp)
+    | <GLOBAL (x, n)> -> Global (x, n)
+    | <BINOP PlusA, t1, t2> ->
+	let v1 = eval_to_addr t1 in
+	let v2 = eval_to_rc t2 in
+	(match (v1, v2) with
+	    (Global (x, m), Const n) -> Global (x, m+n)
+	  | (Global (x, m), RegVal r) -> Index (x, m, r)
+	  | (Offset (m, r), Const n) -> Offset (m+n, r)
+	  | (Offset (m, r1), RegVal r2) ->
+	      let r = gen_reg "add" [RegVal R_any; RegVal r1; RegVal r2] in
+	      Offset (m, reg_of r)
+          | (Index (x, m, r1), RegVal r2) ->
+	      let r = gen_reg "add" [RegVal R_any; RegVal r1; RegVal r2] in
+	      Index (x, m, reg_of r)
+	  | _ -> failwith (sprintf "PlusA $ $" [fRand v1; fRand v2]))
+    | t ->
+	let v1 = eval_to_reg t R_any in
+	Offset (0, reg_of v1)
+
+(* |exec_call| -- execute procedure call *)
+and exec_call n fn args =
+  List.iter (fun t -> gen "push" [eval_to_rc t]) (List.rev args);
+  let p = 
+    match fn with
+	<GLOBAL (lab, off)> -> Global (lab, off)
+      | _ -> eval_to_reg fn R_any in
+  Regs.spill_temps ();
+  gen "call" [p];
+  if n > 0 then
+    gen "add" [RegVal R_sp; RegVal R_sp; Const (4*n)]
+
+(* |branch_op| -- determine branch instruction for comparison operator *)
+let branch_op = 
+  function Eq -> "beq" | Lt -> "blt" | Gt -> "bgt" 
+    | Leq -> "ble" | Geq -> "bge" | Neq -> "bne" 
+    | _ -> failwith "bad comparison"
+
+(* |exec| -- generate code to execute a statement *)
+let exec =
+  function
+      <STORE s, t1, <TEMP n>> ->
+	let v1 = eval_to_reg t1 R_any in
+	Regs.def_temp n (reg_of v1)
+    | <STORE s, t1, t2> ->
+	let v1 = eval_to_reg t1 R_any in
+	let v2 = eval_to_addr t2 in
+	if s = 1 then
+	  gen "stc" [v1; v2]
+	else
+	  gen "stw" [v1; v2]
+    | <CALL (n, r), @(fn::args)> ->
+	exec_call n fn args
+    | <RESULT s, t1> ->
+	ignore (eval_to_reg t1 R_0)
+    | <LABEL lab> ->
+	Risc86.emit_lab lab
+    | <JUMP lab> ->
+	gen "jmp" [Label lab]
+    | <JUMPC (w, lab), t1, t2> ->
+	let v1 = eval_to_reg t1 R_any in
+	let v2 = eval_to_rc t2 in
+	gen (branch_op w) [v1; v2; Label lab]
+    | <JUMPB (b, lab), t1> ->
+	let v1 = eval_to_reg t1 R_any in
+	gen (if b then "bne" else "beq") [v1; Const 0; Label lab]
+    | <w, @ts> -> 
+	failwith (sprintf "exec $" [fInst w])
+
+(* |line| -- current line number *)
+let line = ref 0
+
+(* |process| -- generate code for a statement, or note a line number *)
+let process =
+  function
+      <LINE n> ->
+	if !line <> n then
+	  printf "! $\n" [fStr (Source.get_line n)];
+	line := n
+    | t ->
+	exec t
+
+(* |translate| -- translate a procedure body *)
+let translate lab fsize code =
+  Risc86.start_proc lab fsize;
+  List.iter process code;
+  Risc86.end_proc ()
