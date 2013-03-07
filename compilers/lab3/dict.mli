@@ -14,6 +14,12 @@ type def =
     d_type: ptype;		(* Type *)
     d_lab: string }		(* Global label *)
 
+type_size:ptype -> int
+
+is_array:ptype -> bool
+
+base_type:ptype -> ptype
+
 type environment
 
 (* |define| -- add a definition, raise Exit if already declared *)

@@ -29,6 +29,12 @@ let add_def d env =
 (* |type_error| -- report a type error.  The message could be better. *)
 let type_error () = sem_error "type mismatch in expression" []
 
+(* |check_array| -- check a pair of expressions is an appropriate subscript expression  *)
+let check_array ta tb = 
+  if !(is_array ta) then type_error ();
+  if tb <> Integer then type_error ();
+  base_type ta 
+
 (* |check_monop| -- check a unary operator and return its type *)
 let check_monop w t =
   match w with
@@ -65,7 +71,9 @@ and expr_type env e =
       Variable x -> 
 	lookup_def x env
     | Sub (e1, e2) ->
-	failwith "subscripts not implemented"
+        let ta = check_expr env e1
+        and tb = check_expre env e2 in
+        check_array ta tb 
     | Number n -> Integer
     | Monop (w, e1) -> 
 	let t = check_expr env e1 in

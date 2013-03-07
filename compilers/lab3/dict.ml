@@ -19,6 +19,21 @@ type def =
 
 module IdMap = Map.Make(struct type t = ident  let compare = compare end)
 
+let type_size v =  match v with
+    Integer -> 4
+  | Boolean -> 1
+  | Array(x, y) -> x * (type_size y);; 
+
+let is_array v = match v with
+    Integer -> false
+  | Boolean -> false
+  | Array(x,y) -> true
+
+let base_type v = match v with
+    Integer -> raise Exit;
+  | Boolean -> raise Exit;
+  | Array(x,y) -> y;;
+
 type environment = Env of def IdMap.t
 
 let can f x = try f x; true with Not_found -> false
