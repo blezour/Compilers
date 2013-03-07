@@ -93,6 +93,7 @@ let rec check_stmt env =
         let ta = check_expr env lhs
 	and tb = check_expr env rhs in
 	if ta <> tb then sem_error "type mismatch in assignment" []
+        if (is_array ta) then sem_error "cannot assign to array types" []
     | Print e ->
 	let t = check_expr env e in
 	if t <> Integer then sem_error "print needs an integer" []
